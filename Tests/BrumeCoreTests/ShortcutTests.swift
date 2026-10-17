@@ -103,6 +103,26 @@ struct ShortcutTests {
         #expect(!shortcuts.isCustom(.previousTab))
     }
 
+    @Test func sidebarShortcutUsesCommandBAndPreservesCustomBindings() throws {
+        let defaults = AppSettings.decoded(from: Data(#"{"shortcuts": {}}"#.utf8))!
+        #expect(defaults.shortcuts[.toggleSidebar] == Shortcut("b"))
+        #expect(defaults.shortcuts[.verticalTabs] == Shortcut("s", [.command, .control]))
+        #expect(defaults.shortcuts.issue(assigning: Shortcut("b"), to: .newTab) == .taken(.toggleSidebar))
+        let customized = AppSettings.decoded(from: Data(#"{"shortcuts": {"verticalTabs": "alt+cmd+s", "toggleSidebar": "alt+cmd+b"}}"#.utf8))!
+        let restored = AppSettings.decoded(from: try customized.encoded())!
+        #expect(restored.shortcuts[.verticalTabs] == Shortcut("s", [.command, .option]))
+        #expect(restored.shortcuts[.toggleSidebar] == Shortcut("b", [.command, .option]))
+    }
+
+    @Test func existingCommandBAssignmentsAreNotStolenByTheNewSidebarAction() throws {
+        let settings = AppSettings.decoded(from: Data(#"{"shortcuts": {"verticalTabs": "cmd+b"}}"#.utf8))!
+        var shortcuts = AppSettings.decoded(from: try settings.encoded())!.shortcuts
+        #expect(shortcuts[.verticalTabs] == Shortcut("b"))
+        #expect(shortcuts[.toggleSidebar] == nil)
+        shortcuts.reset(.verticalTabs)
+        #expect(shortcuts[.toggleSidebar] == Shortcut("b"))
+    }
+
     @Test func savedShortcutsAreReadBack() throws {
         var settings = AppSettings()
         settings.shortcuts.set(Shortcut("t", [.command, .option]), for: .newTab)

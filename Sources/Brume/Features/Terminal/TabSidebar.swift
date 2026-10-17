@@ -17,9 +17,12 @@ struct TabSidebar: View {
     /// La place de chaque onglet, groupe déplié compris, dans l'espace de `TerminalScreen`.
     @State private var frames: [UUID: CGRect] = [:]
     @State private var paneFrames: [UUID: CGRect] = [:]
-    /// Le dernier onglet ou split survolé au glisser : un groupe plus haut que l'onglet tenu ne
-    /// le renvoie pas aussitôt d'où il vient.
-    @State private var lastTarget: UUID?
+    @State private var swapTarget: UUID?
+    @State private var detachIndex: Int?
+    @State private var viewport: CGRect = .zero
+    @State private var mergeTarget: UUID?
+    @State private var reorderTarget: UUID?
+    @State private var reordersAfterTarget = false
     @Environment(SettingsStore.self) private var settings
 
     var body: some View {
@@ -33,7 +36,6 @@ struct TabSidebar: View {
                             VStack(spacing: 2) {
                                 TabSidebarRow(tab: tab, workspace: workspace, isDragging: isDragging, number: numbers[tab])
                                     .opacity(workspace.drop?.dragged == .tab(tab) ? 0.5 : 1)
-                                    // Pendant le renommage, glisser dans le champ sélectionne du texte.
                                     .gesture(drag(tab), including: workspace.renaming == .tab(tab) ? .subviews : .all)
                                 if layout.isSplit(tab) && !workspace.collapsed.contains(tab) {
                                     ForEach(layout.panes(of: tab), id: \.self) { pane in
@@ -43,8 +45,30 @@ struct TabSidebar: View {
                                             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(TerminalScreen.space)) } action: {
                                                 paneFrames[pane] = $0
                                             }
+                                            .overlay {
+                                                if swapTarget == pane {
+                                                    RoundedRectangle(cornerRadius: 6)
+                                                        .strokeBorder(Ink.muted, lineWidth: 1)
+                                                        .allowsHitTesting(false)
+                                                }
+                                            }
                                             .transition(.accordion(.vertical))
                                     }
+                                }
+                            }
+                            .overlay {
+                                if mergeTarget == tab {
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .strokeBorder(Ink.muted, lineWidth: 1)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                            .overlay(alignment: reordersAfterTarget ? .bottom : .top) {
+                                if reorderTarget == tab {
+                                    Rectangle()
+                                        .fill(Ink.muted)
+                                        .frame(height: 2)
+                                        .allowsHitTesting(false)
                                 }
                             }
                             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(TerminalScreen.space)) } action: {
@@ -53,6 +77,11 @@ struct TabSidebar: View {
                             .transition(.accordion(.vertical))
                         }
                         NewTabRow(shortcut: settings.shortcutLabel(.newTab)) { workspace.newTab(atEnd: true) }
+                            .overlay(alignment: .top) {
+                                if detachIndex == layout.tabs.count && reorderTarget == nil {
+                                    Rectangle().fill(Ink.muted).frame(height: 2).allowsHitTesting(false)
+                                }
+                            }
                     }
                     // Un onglet ou un split s'ouvre en accordéon, ses voisins et « Nouvel onglet »
                     // glissent avec lui.
@@ -71,11 +100,18 @@ struct TabSidebar: View {
                     withAnimation(Ink.slide) { scroller.scrollTo(tab) }
                 }
             }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(TerminalScreen.space)) } action: {
+                viewport = $0
+            }
         }
         .padding(.top, topInset + 8)
         .frame(width: width)
         .background(Color.black.opacity(0.12))
         .background { WindowDragArea() }
+        .overlay(alignment: .top) {
+            WindowDragArea { workspace.window?.zoom(nil) }
+                .frame(height: topInset)
+        }
         .overlay(alignment: .trailing) {
             TabSidebarEdge(width: width, onResize: onResize, onResizeEnd: onResizeEnd)
         }
@@ -83,53 +119,99 @@ struct TabSidebar: View {
         .accessibilityLabel(L10n.text(.tabs))
     }
 
-    /// Dans la liste, l'onglet tenu prend la place de celui que survole la souris. Sur les
-    /// terminaux, il rejoint l'onglet affiché, comme depuis la barre du haut.
+    /// Le centre d'un onglet le rejoint ; ses bords réordonnent la liste. Sur les terminaux,
+    /// l'onglet rejoint celui affiché, comme depuis la barre du haut.
     private func drag(_ tab: UUID) -> some Gesture {
         DragGesture(minimumDistance: 4, coordinateSpace: .named(TerminalScreen.space))
             .onChanged { value in
                 isDragging = true
-                guard value.location.x < width else {
-                    return workspace.hoverDrop(dragging: .tab(tab), at: value.location)
-                }
-                workspace.hoverDrop(dragging: .tab(tab), at: nil)
-                let tabs = workspace.layout.tabs
-                let hovered = tabs.first { frames[$0].map { ($0.minY ... $0.maxY).contains(value.location.y) } ?? false }
-                guard let target = hovered, target != tab else { return lastTarget = nil }
-                guard target != lastTarget, let index = tabs.firstIndex(of: target) else { return }
-                lastTarget = target
-                workspace.move(tab, to: index)
+                updateTabDrag(tab, at: value.location)
             }
-            .onEnded { _ in
+            .onEnded { value in
+                updateTabDrag(tab, at: value.location)
                 isDragging = false
-                lastTarget = nil
-                workspace.performDrop()
+                if let target = mergeTarget {
+                    workspace.merge(tab, into: target)
+                } else if let target = reorderTarget {
+                    workspace.move(tab, beside: target, after: reordersAfterTarget)
+                } else {
+                    workspace.performDrop()
+                }
+                mergeTarget = nil
+                reorderTarget = nil
             }
     }
 
-    /// Sur un autre split du groupe, il prend sa place. Sur les terminaux, il se pose à côté du
-    /// split visé, avec le même repère qu'un onglet.
+    private func updateTabDrag(_ tab: UUID, at point: CGPoint) {
+        mergeTarget = nil
+        reorderTarget = nil
+        guard point.x < width else {
+            return workspace.hoverDrop(dragging: .tab(tab), at: point)
+        }
+        workspace.hoverDrop(dragging: .tab(tab), at: nil)
+        guard viewport.contains(point) else { return }
+        let tabs = workspace.layout.tabs
+        let hovered = tabs.first { frames[$0].map { ($0.minY ... $0.maxY).contains(point.y) } ?? false }
+        guard let target = hovered, target != tab, tabs.contains(tab), let frame = frames[target] else { return }
+        if (frame.minY + 8 ... frame.maxY - 8).contains(point.y) {
+            mergeTarget = target
+        } else {
+            reorderTarget = target
+            reordersAfterTarget = point.y >= frame.midY
+        }
+    }
+
     private func drag(_ pane: UUID, in tab: UUID) -> some Gesture {
         DragGesture(minimumDistance: 4, coordinateSpace: .named(TerminalScreen.space))
             .onChanged { value in
                 isDragging = true
-                guard value.location.x < width else {
-                    return workspace.hoverDrop(dragging: .pane(pane), at: value.location)
-                }
-                workspace.hoverDrop(dragging: .pane(pane), at: nil)
-                let hovered = workspace.layout.panes(of: tab).first {
-                    paneFrames[$0].map { ($0.minY ... $0.maxY).contains(value.location.y) } ?? false
-                }
-                guard let target = hovered, target != pane else { return lastTarget = nil }
-                guard target != lastTarget else { return }
-                lastTarget = target
-                workspace.swap(pane, target)
+                updatePaneDrag(pane, in: tab, at: value.location)
             }
-            .onEnded { _ in
+            .onEnded { value in
+                updatePaneDrag(pane, in: tab, at: value.location)
                 isDragging = false
-                lastTarget = nil
-                workspace.performDrop()
+                if let index = detachIndex {
+                    workspace.detach(pane, at: index)
+                } else if let target = swapTarget {
+                    workspace.swap(pane, target)
+                } else {
+                    workspace.performDrop()
+                }
+                detachIndex = nil
+                swapTarget = nil
+                reorderTarget = nil
             }
+    }
+
+    private func updatePaneDrag(_ pane: UUID, in tab: UUID, at point: CGPoint) {
+        detachIndex = nil
+        swapTarget = nil
+        reorderTarget = nil
+        guard point.x < width else {
+            return workspace.hoverDrop(dragging: .pane(pane), at: point)
+        }
+        workspace.hoverDrop(dragging: .pane(pane), at: nil)
+        guard viewport.contains(point), workspace.layout.isSplit(tab) else { return }
+        let tabs = workspace.layout.tabs
+        if let target = tabs.first(where: { frames[$0]?.contains(point) == true }), let frame = frames[target],
+           let index = tabs.firstIndex(of: target) {
+            if target == tab && (frame.minY + 8 ... frame.maxY - 8).contains(point.y) {
+                swapTarget = workspace.layout.panes(of: tab).first {
+                    $0 != pane && paneFrames[$0]?.contains(point) == true
+                }
+            } else {
+                reordersAfterTarget = point.y >= frame.midY
+                reorderTarget = target
+                detachIndex = index + (reordersAfterTarget ? 1 : 0)
+            }
+        } else {
+            let index = tabs.firstIndex { (frames[$0]?.minY ?? .infinity) > point.y } ?? tabs.count
+            detachIndex = index
+            if index < tabs.count {
+                reorderTarget = tabs[index]
+                reordersAfterTarget = false
+            }
+        }
     }
 }
 

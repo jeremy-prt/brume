@@ -19,6 +19,9 @@ struct WindowDragArea: NSViewRepresentable {
         var onDoubleClick: (() -> Void)?
         private var pressed: NSEvent?
 
+        // Dragging and double-clicks are handled below; AppKit must not also treat them as title-bar clicks.
+        override var mouseDownCanMoveWindow: Bool { false }
+
         override func isAccessibilityElement() -> Bool {
             false
         }

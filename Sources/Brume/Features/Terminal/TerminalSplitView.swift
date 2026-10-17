@@ -2,19 +2,19 @@ import BrumeCore
 import GhosttyTerminal
 import SwiftUI
 
-/// Les splits de l'onglet affiché, sous la barre d'onglets du haut, ou à droite de la barre
-/// latérale et sous l'en-tête.
+/// Les splits de l'onglet affiché, sous la barre d'onglets du haut, ou à droite de la barre latérale.
 struct TerminalSplitView: View {
     let workspace: TerminalWorkspace
     let titlebar: WindowTitlebar
     let showsNumbers: Bool
-    /// Nil : les onglets en haut.
     let sidebarWidth: CGFloat?
+    let showsHorizontalTabs: Bool
 
     var body: some View {
         GeometryReader { geometry in
             let window = CGRect(origin: .zero, size: geometry.size)
-            let barHeight = titlebar.buttonsCenterY * 2
+            // Sans barre latérale, les boutons de fenêtre ne doivent pas recouvrir le shell.
+            let barHeight = showsHorizontalTabs || sidebarWidth == nil ? titlebar.buttonsCenterY * 2 : 0
             // Le trait du bord de la barre latérale a sa propre colonne.
             let bounds = window.divided(atDistance: sidebarWidth.map { $0 + 1 } ?? 0, from: .minXEdge).remainder
                 .divided(atDistance: barHeight, from: .minYEdge).remainder
@@ -49,7 +49,7 @@ struct TerminalSplitView: View {
                         .accessibilityHidden(!isShown)
                     }
                 }
-                if sidebarWidth == nil {
+                if showsHorizontalTabs {
                     TabBar(
                         workspace: workspace,
                         width: window.width,
@@ -57,6 +57,9 @@ struct TerminalSplitView: View {
                         leadingInset: titlebar.isFullScreen ? 8 : titlebar.buttonsWidth + 14,
                         showsNumbers: showsNumbers
                     )
+                } else if sidebarWidth == nil {
+                    WindowDragArea { workspace.window?.zoom(nil) }
+                        .frame(width: window.width, height: barHeight)
                 }
                 // Identifiées par leur place dans l'arbre : stable pendant un glissé.
                 ForEach(zoomed == nil ? layout.selectedSplits.tree.dividers(in: bounds) : [], id: \.path) { divider in

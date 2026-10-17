@@ -22,6 +22,14 @@ extension TerminalWorkspace {
         focus(layout.focusedPane)
     }
 
+    func merge(_ tab: UUID, into target: UUID) {
+        guard tab != target, layout.tabs.contains(tab), layout.tabs.contains(target) else { return }
+        unzoom()
+        collapsed.remove(target)
+        apply(layout.merging(tab, into: target))
+        focus(layout.focusedPane)
+    }
+
     private func unzoom() {
         guard zoomedPane != nil else { return }
         zoomedPane = nil

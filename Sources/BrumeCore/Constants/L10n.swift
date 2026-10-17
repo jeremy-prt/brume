@@ -60,7 +60,7 @@ public enum TextKey: CaseIterable, Sendable {
     case informationHint, infoNone, infoEssential, infoCategories, position, positionHint, alignLeft, alignCenter, alignRight, preview
     case visualSlime, visualGem, visualMoon, visualMushroom, visualTurtle, visualBreath, visualPrompt
     case visualSaturn, visualCloud, content, contentHint, contentVisual, contentText, contentBoth, welcomeSize, welcomeSizeHint, sizeSmall, sizeMedium, sizeLarge, informationGroup, informationGroupHint, showContent, showContentHint, characters, welcomeTextPlaceholder
-    case tabs, verticalTabs, verticalTabsHint, fullPath, fullPathHint, closeTabsBelow, tabIcon, sidebarWidth, zoomSplit, newActivity, inProgress, inProgressPercent, progressError, progressPaused, secureInput
+    case tabs, verticalTabs, verticalTabsHint, toggleSidebar, fullPath, fullPathHint, closeTabsBelow, tabIcon, sidebarWidth, zoomSplit, newActivity, inProgress, inProgressPercent, progressError, progressPaused, secureInput
     case ungroup, leaveGroup, closeTerminal, expandGroup, collapseGroup, group, copy, paste, renameGroup, renameTerminal, closeGroup
     case iconTerminal, iconProject, iconServer, iconMachine, iconCloud, iconWeb, iconDatabase, iconContainer, iconCode, iconTools, iconAI, iconProduction
     case updates, currentVersion, checkForUpdates, checkAutomatically, checkAutomaticallyHint, installAutomatically, installAutomaticallyHint
@@ -253,6 +253,7 @@ public enum TextKey: CaseIterable, Sendable {
         case .welcomeTextPlaceholder: "Votre mot"
         case .sizeLarge: "Grande"
         case .tabs: "Onglets"
+        case .toggleSidebar: "Afficher/Masquer la barre latérale"
         case .verticalTabs: "Onglets verticaux"
         case .verticalTabsHint: "Liste les onglets dans une barre latérale à gauche plutôt qu'en haut de la fenêtre."
         case .fullPath: "Chemin complet dans les onglets"
@@ -535,6 +536,7 @@ public enum TextKey: CaseIterable, Sendable {
         case .welcomeTextPlaceholder: "Your word"
         case .sizeLarge: "Large"
         case .tabs: "Tabs"
+        case .toggleSidebar: "Show/Hide Sidebar"
         case .verticalTabs: "Vertical Tabs"
         case .verticalTabsHint: "Lists tabs in a sidebar on the left instead of across the top of the window."
         case .fullPath: "Full Path in Tabs"

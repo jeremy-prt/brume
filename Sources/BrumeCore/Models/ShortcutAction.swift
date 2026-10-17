@@ -19,12 +19,12 @@ public enum ShortcutCategory: CaseIterable, Sendable {
 /// (⌘Q, ⌘N, ⌘,) restent fixes. Le nom de chaque cas est sa clé dans le fichier des réglages :
 /// ne pas le renommer.
 public enum ShortcutAction: String, CaseIterable, Sendable {
-    case newTab, renameTab, closeTerminal, closeTab, previousTab, nextTab, selectTab, verticalTabs, resetWindow
+    case newTab, renameTab, closeTerminal, closeTab, previousTab, nextTab, selectTab, verticalTabs, toggleSidebar, resetWindow
     case splitRight, splitDown, zoomSplit, focusPreviousSplit, focusNextSplit, equalizeSplits
 
     public var category: ShortcutCategory {
         switch self {
-        case .newTab, .renameTab, .closeTerminal, .closeTab, .previousTab, .nextTab, .selectTab, .verticalTabs, .resetWindow: .tabs
+        case .newTab, .renameTab, .closeTerminal, .closeTab, .previousTab, .nextTab, .selectTab, .verticalTabs, .toggleSidebar, .resetWindow: .tabs
         case .splitRight, .splitDown, .zoomSplit, .focusPreviousSplit, .focusNextSplit, .equalizeSplits: .splits
         }
     }
@@ -45,6 +45,7 @@ public enum ShortcutAction: String, CaseIterable, Sendable {
         case .focusNextSplit: .focusNextSplit
         case .equalizeSplits: .equalizeSplits
         case .verticalTabs: .verticalTabs
+        case .toggleSidebar: .toggleSidebar
         case .resetWindow: .resetWindow
         }
     }
@@ -57,7 +58,7 @@ public enum ShortcutAction: String, CaseIterable, Sendable {
         }
     }
 
-    /// Ceux de Ghostty, et ⌃⌘S, celui de macOS pour la barre latérale (Finder, Mail, Notes).
+    /// Ceux de Ghostty, ⌃⌘S pour l'orientation et ⌘B pour la barre latérale.
     /// Pour `selectTab`, seules les touches de modification comptent : elles vont avec 1 à 9.
     public var defaultShortcut: Shortcut {
         switch self {
@@ -75,6 +76,7 @@ public enum ShortcutAction: String, CaseIterable, Sendable {
         case .focusNextSplit: Shortcut("]")
         case .equalizeSplits: Shortcut("=", [.command, .control])
         case .verticalTabs: Shortcut("s", [.command, .control])
+        case .toggleSidebar: Shortcut("b")
         case .resetWindow: Shortcut("r", [.command, .option])
         }
     }

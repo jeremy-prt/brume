@@ -74,6 +74,24 @@ struct WindowLayoutTests {
         #expect(twoTabs.moving("A", by: -1).tabs == ["A", "B"])
     }
 
+    @Test func movingBesideATabRespectsBothEdgesInEitherDirection() {
+        let original = WindowLayout(tab: "A", pane: 1).appendingTab("B", pane: 2).appendingTab("C", pane: 3)
+        for (tab, after, expected) in [
+            ("A", false, ["A", "B", "C"]),
+            ("A", true, ["B", "A", "C"]),
+            ("C", false, ["A", "C", "B"]),
+            ("C", true, ["A", "B", "C"]),
+        ] {
+            let layout = original.moving(tab, beside: "B", after: after)
+            #expect(layout.tabs == expected)
+            #expect(layout.selectedTab == "C")
+            #expect(layout.isConsistent)
+        }
+        #expect(original.moving("A", beside: "A", after: true) == original)
+        #expect(original.moving("A", beside: "missing", after: false) == original)
+        #expect(original.moving("missing", beside: "B", after: true) == original)
+    }
+
     @Test func detachingMovesAPaneToItsOwnTab() {
         let layout = twoTabs.detaching(2, into: "C")
         #expect(layout.tabs == ["A", "C", "B"])
@@ -81,6 +99,18 @@ struct WindowLayoutTests {
         #expect(layout.panes(of: "C") == [2])
         #expect(layout.selectedTab == "C")
         #expect(twoTabs.detaching(3, into: "C") == twoTabs)
+    }
+
+    @Test(arguments: [0, 1, 2]) func detachingPlacesTheNewTabAtTheDropPosition(_ index: Int) {
+        let layout = twoTabs.detaching(2, into: "C", at: index)
+        var expected = ["A", "B"]
+        expected.insert("C", at: index)
+        #expect(layout.tabs == expected)
+        #expect(layout.panes(of: "A") == [1])
+        #expect(layout.panes(of: "C") == [2])
+        #expect(layout.selectedTab == "C")
+        #expect(layout.focusedPane == 2)
+        #expect(layout.isConsistent)
     }
 
     @Test func separatingGivesEachPaneATab() {
@@ -156,6 +186,45 @@ struct WindowLayoutTests {
         let layout = twoTabs.dropping(drop)
         #expect(layout.tabs == ["A"])
         #expect(layout.panes(of: "A") == [1, 2, 3])
+    }
+
+    @Test func mergingTwoSingleTabsCreatesAGroup() {
+        let original = WindowLayout(tab: "A", pane: 1).addingTab("B", pane: 2)
+        let layout = original.merging("B", into: "A")
+        #expect(layout.tabs == ["A"])
+        #expect(layout.selectedTab == "A")
+        #expect(layout.isSplit("A"))
+        #expect(layout.selectedSplits.tree == .split(.horizontal, ratio: 0.5, .pane(1), .pane(2)))
+        #expect(layout.focusedPane == 2)
+        #expect(layout.isConsistent)
+    }
+
+    @Test func mergingIntoAnUnselectedGroupPreservesItsPanesAndMovesFocus() {
+        let layout = twoTabs.selecting("B").merging("B", into: "A")
+        #expect(layout.tabs == ["A"])
+        #expect(layout.selectedTab == "A")
+        #expect(layout.selectedSplits.tree == .split(.horizontal, ratio: 0.5, .pane(1),
+            .split(.horizontal, ratio: 0.5, .pane(2), .pane(3))))
+        #expect(layout.focusedPane == 3)
+        #expect(layout.isConsistent)
+    }
+
+    @Test func mergingAnEntireGroupPreservesItsSplitTree() {
+        let original = twoTabs.selecting("B").splitting(toward: .down, pane: 4).addingTab("C", pane: 5)
+        let layout = original.merging("B", into: "A")
+        #expect(layout.tabs == ["A", "C"])
+        #expect(layout.panes(of: "A") == [1, 2, 3, 4])
+        #expect(layout.panes(of: "C") == [5])
+        #expect(layout.focusedPane == 4)
+        #expect(layout.selectedSplits.tree == .split(.horizontal, ratio: 0.5, .pane(1),
+            .split(.horizontal, ratio: 0.5, .pane(2), original.splits["B"]!.tree)))
+        #expect(layout.isConsistent)
+    }
+
+    @Test func mergingMissingTabsOrTheSameTabDoesNothing() {
+        #expect(twoTabs.merging("B", into: "B") == twoTabs)
+        #expect(twoTabs.merging("missing", into: "A") == twoTabs)
+        #expect(twoTabs.merging("B", into: "missing") == twoTabs)
     }
 
     @Test func swappingReordersAGroup() {

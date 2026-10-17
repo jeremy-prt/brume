@@ -170,20 +170,27 @@ public struct WindowLayout<Tab: Hashable & Sendable, Pane: Hashable & Sendable>:
         return layout
     }
 
+    public func moving(_ tab: Tab, beside target: Tab, after: Bool) -> WindowLayout {
+        guard tab != target, let sourceIndex = tabs.firstIndex(of: tab),
+              let targetIndex = tabs.firstIndex(of: target) else { return self }
+        let index = targetIndex + (after ? 1 : 0) - (sourceIndex < targetIndex ? 1 : 0)
+        return moving(tab, to: index)
+    }
+
     /// D'une place, au clavier.
     public func moving(_ tab: Tab, by offset: Int) -> WindowLayout {
         guard let index = tabs.firstIndex(of: tab) else { return self }
         return moving(tab, to: index + offset)
     }
 
-    /// Le split part dans son propre onglet, juste après le sien, affiché.
-    public func detaching(_ pane: Pane, into newTab: Tab) -> WindowLayout {
+    /// Sans position choisie, le split part juste après son onglet d'origine, affiché.
+    public func detaching(_ pane: Pane, into newTab: Tab, at index: Int? = nil) -> WindowLayout {
         guard let tab = tab(of: pane), let remaining = splits[tab]?.removing(pane) else { return self }
         var layout = self
         layout.splits[tab] = remaining
         layout.tabList = tabList.selecting(tab).inserting(newTab)
         layout.splits[newTab] = Splits(pane)
-        return layout
+        return index.map { layout.moving(newTab, to: $0) } ?? layout
     }
 
     /// Chaque split devient un onglet, à la suite : le premier garde l'onglet, `newTabs` donne
@@ -242,6 +249,12 @@ public struct WindowLayout<Tab: Hashable & Sendable, Pane: Hashable & Sendable>:
             layout.splits[layout.selectedTab] = target.inserting(.pane(pane), beside: drop.target, toward: drop.direction, focusing: pane)
             return layout
         }
+    }
+
+    public func merging(_ tab: Tab, into target: Tab) -> WindowLayout {
+        guard tab != target, splits[tab] != nil, let destination = splits[target] else { return self }
+        let drop = Drop(dragged: .tab(tab), target: destination.focused, direction: .right, highlight: .zero)
+        return selecting(target).dropping(drop)
     }
 
     /// Deux splits d'un même onglet échangent leur place : réordonner un groupe.

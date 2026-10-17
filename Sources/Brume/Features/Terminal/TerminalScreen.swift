@@ -57,14 +57,18 @@ private struct TerminalWindow: View {
     }
 
     var body: some View {
+        let sidebarVisible = settings.verticalTabs.isOn && !workspace.isSidebarHidden
         ZStack {
             let showsTerminals = workspace.settingsSection == nil
             let showsNumbers = commandKey.isHeld && isActive
             let sidebarWidth = showsSidebar ? draggedSidebarWidth ?? settings.verticalTabs.width : nil
             // Cachés et non retirés : une vue terminal recréée tuerait son shell. La barre latérale
-            // et l'en-tête s'ajoutent à côté, sans déplacer `TerminalSplitView` dans l'arbre.
+            // s'ajoute à côté, sans déplacer `TerminalSplitView` dans l'arbre.
             ZStack(alignment: .topLeading) {
-                TerminalSplitView(workspace: workspace, titlebar: titlebar, showsNumbers: showsNumbers, sidebarWidth: sidebarWidth)
+                TerminalSplitView(
+                    workspace: workspace, titlebar: titlebar, showsNumbers: showsNumbers,
+                    sidebarWidth: sidebarWidth, showsHorizontalTabs: !settings.verticalTabs.isOn
+                )
                 if let sidebarWidth {
                     TabSidebar(
                         workspace: workspace,
@@ -77,8 +81,6 @@ private struct TerminalWindow: View {
                             draggedSidebarWidth = nil
                         }
                     )
-                    TerminalHeader(state: workspace.focused, workspace: workspace, height: titlebar.buttonsCenterY * 2)
-                        .padding(.leading, sidebarWidth + 1)
                 }
             }
             .coordinateSpace(.named(TerminalScreen.space))
@@ -122,7 +124,7 @@ private struct TerminalWindow: View {
         .onChange(of: TerminalThemes.colors(for: settings.appearance)) { ThemeFade.run(to: $1) }
         .onChange(of: settings.font) { TerminalWorkspace.setFont($1) }
         .task(id: settings.shortcuts[.selectTab]) { commandKey.modifiers = settings.tabNumberModifiers }
-        .onChange(of: settings.verticalTabs.isOn) { _, isOn in
+        .onChange(of: sidebarVisible) { _, isOn in
             withAnimation(Ink.motion(.easeIn(duration: 0.1))) { isSwitchingTabs = true } completion: {
                 showsSidebar = isOn
                 // Un tour de plus : les terminaux se redessinent à leur taille avant de réapparaître.

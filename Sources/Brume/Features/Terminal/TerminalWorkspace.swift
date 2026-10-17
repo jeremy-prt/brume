@@ -89,6 +89,8 @@ final class TerminalWorkspace {
         didSet { onSnapshotChange?() }
     }
     var renaming: TabItem?
+    /// Masquage temporaire propre à cette fenêtre, sans changer l'orientation enregistrée.
+    var isSidebarHidden = false
     /// Les splits où une commande ou une progression a fini, où ça a sonné ou notifié (Claude Code
     /// qui attend une réponse) depuis qu'on les a regardés.
     private(set) var paneActivity: [UUID: TerminalActivity] = [:] {

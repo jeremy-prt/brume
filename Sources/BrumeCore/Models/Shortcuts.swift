@@ -34,6 +34,13 @@ public struct Shortcuts: Hashable, Sendable {
 
     public subscript(action: ShortcutAction) -> Shortcut? {
         if let override = overrides[action] { return override }
+        // ⌘B pouvait déjà être personnalisé avant l'ajout de cette action.
+        if action == .toggleSidebar, overrides.contains(where: { other, shortcut in
+            guard let shortcut else { return false }
+            return Self.combinations(of: shortcut, for: other).contains(action.defaultShortcut)
+        }) {
+            return nil
+        }
         return action.defaultShortcut
     }
 

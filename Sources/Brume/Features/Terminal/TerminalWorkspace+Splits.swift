@@ -73,8 +73,8 @@ extension TerminalWorkspace {
         if let pane { focus(pane) }
     }
 
-    func detach(_ pane: UUID) {
-        apply(layout.detaching(pane, into: UUID()))
+    func detach(_ pane: UUID, at index: Int? = nil) {
+        apply(layout.detaching(pane, into: UUID(), at: index))
         focus(pane)
     }
 }

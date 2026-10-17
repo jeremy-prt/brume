@@ -43,6 +43,10 @@ extension TerminalWorkspace {
         layout = layout.moving(tab, to: index)
     }
 
+    func move(_ tab: UUID, beside target: UUID, after: Bool) {
+        layout = layout.moving(tab, beside: target, after: after)
+    }
+
     func moveSelectedTab(by offset: Int) {
         layout = layout.moving(layout.selectedTab, by: offset)
     }
@@ -159,6 +163,7 @@ extension TerminalWorkspace {
     /// Nil : l'onglet affiché.
     func startRenaming(_ item: TabItem? = nil) {
         guard settingsSection == nil else { return }
+        isSidebarHidden = false
         let item = item ?? .tab(layout.selectedTab)
         switch item {
         case let .tab(tab): select(tab)
